@@ -1,31 +1,43 @@
 import React, { useEffect, useReducer } from 'react'
-import { NavigationContainer } from '@react-navigation/native';
-import { StyleSheet, View, Platform, Button, Text } from 'react-native'
+import { Platform, Pressable, Vibration } from 'react-native'
 import useInterval from '../hooks/useInterval'
 import GameBoard, { GameBoardProps } from '../components/GameBoard'
-import { GAME_STATUSES, KEY_TO_DIRECTION } from '../constants/game'
+import {
+  GAME_STATUSES,
+  KEY_TO_DIRECTION,
+  pixelSize,
+  pixelMargin,
+  LEVEL,
+} from '../constants/game'
 import { isGameOver, nextSnake } from '../utils/controls'
-import SwipeConsole from '../components/SwipeConsole'
-const pixelSize: number = 15
-const pixelMargin: number = 2
-const squareSize: number = 15
+import AppContainer from '../components/Styled/AppContainer'
+import { GamePad, GamePadSwitch, GAME_PAD_MODE } from '../components/GamePad'
+import {
+  FlexRow,
+  SecondaryBtnContainer,
+  SecondaryBtnLabel,
+} from '../components/Styled/Buttons'
 
 const initialState = {
-  snake: [1, 2, 3],
-  food: 20,
+  ...LEVEL[0],
   direction: null,
   platform: '',
   status: GAME_STATUSES.NOT_STARTED,
-  speed: 150,
   score: 0,
+  gamePadMode: GAME_PAD_MODE.BUTTON,
 }
 
 const reducer = (state, action) => {
   switch (action.type) {
+    case 'SETUP_GAME':
+      const { gameMode } = action.payload
+      return {
+        ...state,
+        ...LEVEL[gameMode],
+      }
     case 'START_NEW_GAME':
       return {
         ...state,
-        snake: initialState.snake,
         direction: KEY_TO_DIRECTION.ArrowDown,
         status: GAME_STATUSES.PLAYING,
       }
@@ -56,6 +68,8 @@ const reducer = (state, action) => {
       } else {
         return state
       }
+    case 'CHANGE_GAME_PAD_MODE':
+      return { ...state, gamePadMode: action.payload }
     case 'GAME_OVER':
       return { ...state, status: GAME_STATUSES.GAME_OVER }
     default:
@@ -63,10 +77,13 @@ const reducer = (state, action) => {
   }
 }
 
-export default function App() {
+const Game = ({ route }) => {
   const [state, dispatch] = useReducer(reducer, initialState)
-
+  const { gameMode } = route?.params || {}
   useEffect(() => {
+    if ([0, 1, 2].includes(gameMode)) {
+      dispatch({ type: 'SETUP_GAME', payload: { gameMode } })
+    }
     if (Platform.OS == 'web') {
       window.addEventListener('keydown', updateDirection)
       return () => {
@@ -76,7 +93,6 @@ export default function App() {
   }, [])
 
   const updateDirection = (event) => {
-    console.log(event)
     const key = event.key
     if (
       Object.entries(KEY_TO_DIRECTION)
@@ -104,16 +120,19 @@ export default function App() {
         snake: state.snake,
         direction: state.direction,
         food: state.food,
-        squareSize,
+        squareSize: state.squareSize,
       })
       const snakeHead = newSnake?.[newSnake?.length - 1]
       if (isGameOver({ snake: newSnake })) {
         dispatch({ type: 'GAME_OVER' })
+        Vibration.vibrate()
       } else if (snakeHead >= 0) {
         if (snakeHead == state.food) {
           dispatch({
             type: 'UPDATE_FOOD',
-            payload: Math.floor(Math.random() * squareSize * squareSize),
+            payload: Math.floor(
+              Math.random() * state.squareSize * state.squareSize
+            ),
           })
         }
         dispatch({ type: 'UPDATE_SNAKE', payload: newSnake })
@@ -126,45 +145,43 @@ export default function App() {
     food: state.food,
     pixelMargin,
     pixelSize,
-    squareSize,
+    squareSize: state.squareSize,
     status: state.status,
   }
   return (
-    <View style={styles.container}>
+    <AppContainer style={{ justifyContent: 'flex-start', paddingTop: 20 }}>
       <GameBoard {...gameProps} />
-      {state.status == GAME_STATUSES.NOT_STARTED && (
-        <Button
-          title="New Game"
-          onPress={() => dispatch({ type: 'START_NEW_GAME' })}
+      {state.status == GAME_STATUSES.GAME_OVER && <SecondaryBtnLabel>Game Over</SecondaryBtnLabel>}
+      <FlexRow style={{ width: 300, marginTop: 20 }}>
+        {state.status == GAME_STATUSES.NOT_STARTED ? (
+          <Pressable onPress={() => dispatch({ type: 'START_NEW_GAME' })}>
+            {({ pressed }) => (
+              <SecondaryBtnContainer pressed={pressed}>
+                <SecondaryBtnLabel pressed={pressed}>Start</SecondaryBtnLabel>
+              </SecondaryBtnContainer>
+            )}
+          </Pressable>
+        ) : (
+          <SecondaryBtnLabel>Score: {state.score}</SecondaryBtnLabel>
+        )}
+        <GamePadSwitch
+          gamePadMode={state.gamePadMode}
+          onPress={(gamePadMode) =>
+            dispatch({ type: 'CHANGE_GAME_PAD_MODE', payload: gamePadMode })
+          }
         />
-      )}
-      {state.status != GAME_STATUSES.NOT_STARTED && (
-        <Text>Score: {state.score}</Text>
-      )}
-      {state.status == GAME_STATUSES.GAME_OVER && <Text>Game Over</Text>}
+      </FlexRow>
       {Platform.OS != 'web' && (
-        <SwipeConsole
-          onSwipeUp={() => updateDirection({ key: KEY_TO_DIRECTION.ArrowUp })}
-          onSwipeDown={() =>
-            updateDirection({ key: KEY_TO_DIRECTION.ArrowDown })
-          }
-          onSwipeRight={() =>
-            updateDirection({ key: KEY_TO_DIRECTION.ArrowRight })
-          }
-          onSwipeLeft={() =>
-            updateDirection({ key: KEY_TO_DIRECTION.ArrowLeft })
-          }
+        <GamePad
+          gamePadMode={state.gamePadMode}
+          onUp={() => updateDirection({ key: KEY_TO_DIRECTION.ArrowUp })}
+          onDown={() => updateDirection({ key: KEY_TO_DIRECTION.ArrowDown })}
+          onRight={() => updateDirection({ key: KEY_TO_DIRECTION.ArrowRight })}
+          onLeft={() => updateDirection({ key: KEY_TO_DIRECTION.ArrowLeft })}
         />
       )}
-    </View>
+    </AppContainer>
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-})
+export default Game

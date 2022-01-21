@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTheme } from 'styled-components/native'
 import Pixel from './Styled/Pixel'
 
 interface PixelProps {
@@ -11,6 +12,7 @@ interface PixelProps {
 
 const Pixels = (p: PixelProps) => {
   let pixels = []
+  const theme = useTheme()
   for (let i: number = 0; i < p.pixelCount; i++) {
     pixels.push(
       <Pixel
@@ -18,7 +20,7 @@ const Pixels = (p: PixelProps) => {
         margin={p.pixelMargin}
         key={`pixel-id-${i}`}
         color={
-          p.snake.includes(i) ? '#ff647c' : p.food == i ? '#ffb800' : '#eee'
+          p.snake.includes(i) ? theme?.colors?.snake : p.food == i ? theme?.colors?.food : theme?.colors?.board
         }
       />
     )

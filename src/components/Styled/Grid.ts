@@ -13,7 +13,7 @@ const Grid = styled.View`
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  background-color: #fff;
+  background-color: ${p => p.theme.colors.background};
   ${gridSize}
 `
 
